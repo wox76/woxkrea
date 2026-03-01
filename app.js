@@ -14,20 +14,20 @@ let model;
 // --- 1. INIZIALIZZAZIONE IA ---
 async function initAI() {
     try {
-        status.textContent = "Sto scaricando il modello via WebGPU (circa 2GB)...";
+        status.textContent = "Sto scaricando il modello via WebGPU...";
 
-        // La versione 3 di Transformers.js usa l'org ufficiale '@huggingface' e 'onnx-community'
-        // 'onnx-community/sd-turbo' è veloce e adatto al browser con WebGPU
-        const modelName = 'onnx-community/sd-turbo';
+        // Pipeline 'image-to-image' è quella supportata da Transformers.js v3
+        // 'onnx-community/swin2SR-classical-sr-x2-64' è un modello di super-risoluzione legero e compatibile
+        const modelName = 'onnx-community/swin2SR-classical-sr-x2-64';
 
-        // Attenzione: usiamo 'text-to-image' dato che SD Turbo nativo è primariamente text-to-image e compatibile con WebGPU
-        model = await pipeline('text-to-image', modelName, {
+        model = await pipeline('image-to-image', modelName, {
             device: 'webgpu',
         });
 
-        status.textContent = "IA Pronta! Usa il modello " + modelName;
+        status.textContent = "IA Pronta! Modello: " + modelName;
     } catch (err) {
         status.textContent = "Errore durante il caricamento del modello.";
+
 
         console.error(err);
     }
