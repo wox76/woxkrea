@@ -8,7 +8,7 @@ const hfTokenInput = document.getElementById('hfToken');
 
 // Endpoint per modello Image-to-Image (Stable Diffusion v1.5 img2img è il più stabile via API gratuite)
 // Avvolgiamo l'URL in un Proxy CORS pubblico per aggirare il blocco di preflight del browser
-const BASE_HF_URL = 'https://api-inference.huggingface.co/models/runwayml/stable-diffusion-v1-5';
+const BASE_HF_URL = 'https://router.huggingface.co/hf-inference/models/runwayml/stable-diffusion-v1-5';
 const HF_MODEL_URL = 'https://corsproxy.io/?' + encodeURIComponent(BASE_HF_URL);
 
 // Stato
