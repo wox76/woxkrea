@@ -6,8 +6,9 @@ const status = document.getElementById('status');
 const promptInput = document.getElementById('prompt');
 const hfTokenInput = document.getElementById('hfToken');
 
-// Utilizziamo FLUX.1-schnell: modello gratuito, veloce, supportato ufficialmente sul nuovo router HF
-const BASE_HF_URL = 'https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell';
+// instruct-pix2pix: accetta ENTRAMBI un'immagine (il disegno) + un prompt testuale
+// ed genera un'immagine che combina i due input
+const BASE_HF_URL = 'https://router.huggingface.co/hf-inference/models/timbrooks/instruct-pix2pix';
 const HF_MODEL_URL = 'https://corsproxy.io/?' + encodeURIComponent(BASE_HF_URL);
 
 // Stato
@@ -69,8 +70,14 @@ async function generateImage() {
         const imageBlob = await getCanvasBlob(inputCanvas);
         const promptText = promptInput.value || "A beautiful highly detailed digital painting";
 
-        // Inviamo solo il prompt come JSON - FLUX.1-schnell è un modello text-to-image puro
-        // Il disegno sul canvas serve come riferimento visivo, ma il modello genera dall'input testuale
+        // Convertiamo il canvas in base64 JPEG per passarlo al modello come immagine di input
+        const b64Image = await new Promise(resolve => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result.split(',')[1]);
+            reader.readAsDataURL(imageBlob);
+        });
+
+        // instruct-pix2pix accetta: inputs = immagine base64, parameters.prompt = testo
         const response = await fetch(HF_MODEL_URL, {
             method: 'POST',
             headers: {
@@ -78,7 +85,12 @@ async function generateImage() {
                 'Content-Type': 'application/json',
                 'X-Wait-For-Model': 'true'
             },
-            body: JSON.stringify({ inputs: promptText })
+            body: JSON.stringify({
+                inputs: b64Image,
+                parameters: {
+                    prompt: promptText
+                }
+            })
         });
 
         if (!response.ok) {
