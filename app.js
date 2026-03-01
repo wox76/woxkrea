@@ -17,7 +17,7 @@ async function initAI() {
     try {
         // Specifica dtype per tutti i dispositivi (WebGPU e WASM)
         const opts = {
-            dtype: 'fp32',
+            dtype: { model: 'fp32' },
             progress_callback: (info) => {
                 if (info.status === 'downloading' && info.total) {
                     const pct = Math.round((info.loaded / info.total) * 100);
