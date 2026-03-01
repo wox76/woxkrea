@@ -6,9 +6,8 @@ const status = document.getElementById('status');
 const promptInput = document.getElementById('prompt');
 const hfTokenInput = document.getElementById('hfToken');
 
-// Endpoint per modello Image-to-Image (Stable Diffusion v1.5 img2img è il più stabile via API gratuite)
-// Avvolgiamo l'URL in un Proxy CORS pubblico per aggirare il blocco di preflight del browser
-const BASE_HF_URL = 'https://router.huggingface.co/hf-inference/models/runwayml/stable-diffusion-v1-5';
+// Utilizziamo FLUX.1-schnell: modello gratuito, veloce, supportato ufficialmente sul nuovo router HF
+const BASE_HF_URL = 'https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell';
 const HF_MODEL_URL = 'https://corsproxy.io/?' + encodeURIComponent(BASE_HF_URL);
 
 // Stato
@@ -70,23 +69,16 @@ async function generateImage() {
         const imageBlob = await getCanvasBlob(inputCanvas);
         const promptText = promptInput.value || "A beautiful highly detailed digital painting";
 
-        // ATTENZIONE CORS: Inviare JSON con "Content-Type: application/json" fa scattare 
-        // una richiesta OPTIONS (Preflight) che i server di Hugging Face bloccano spesso.
-        // Soluzione: Inviare il file binario puro come body. L'API di HF capisce in automatico.
-
-        // Trasformiamo il Blob in ArrayBuffer per una spedizione più grezza e sicura
-        const arrayBuffer = await imageBlob.arrayBuffer();
-
+        // Inviamo solo il prompt come JSON - FLUX.1-schnell è un modello text-to-image puro
+        // Il disegno sul canvas serve come riferimento visivo, ma il modello genera dall'input testuale
         const response = await fetch(HF_MODEL_URL, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`,
-                'X-Wait-For-Model': 'true', // Aggiunto per attendere il caricamento del modello
-                'X-Use-Cache': 'false', // Aggiunto per evitare cache se si vuole sempre nuova generazione
-                'Content-Type': 'image/jpeg', // Specifico il tipo di immagine
-                'Accept': 'image/jpeg' // Dico che accetto un'immagine come risposta
+                'Content-Type': 'application/json',
+                'X-Wait-For-Model': 'true'
             },
-            body: arrayBuffer
+            body: JSON.stringify({ inputs: promptText })
         });
 
         if (!response.ok) {
