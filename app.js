@@ -16,9 +16,9 @@ async function initAI() {
     try {
         status.textContent = "Sto scaricando il modello via WebGPU...";
 
-        // Pipeline 'image-to-image' è quella supportata da Transformers.js v3
-        // 'onnx-community/swin2SR-classical-sr-x2-64' è un modello di super-risoluzione legero e compatibile
-        const modelName = 'onnx-community/swin2SR-classical-sr-x2-64';
+        // Pipeline 'image-to-image' supportata da Transformers.js v3
+        // 'Xenova/swin2SR-classical-sr-x2-64' è pubblico e non richiede autenticazione
+        const modelName = 'Xenova/swin2SR-classical-sr-x2-64';
 
         model = await pipeline('image-to-image', modelName, {
             device: 'webgpu',
