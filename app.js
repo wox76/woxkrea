@@ -16,6 +16,7 @@ async function initAI() {
     status.textContent = "Download modello in corso...";
     try {
         model = await pipeline('image-to-image', 'Xenova/swin2SR-classical-sr-x2-64', {
+            dtype: 'fp32',
             progress_callback: (info) => {
                 if (info.status === 'downloading' && info.total) {
                     const pct = Math.round((info.loaded / info.total) * 100);
