@@ -69,12 +69,31 @@ async function generateImage() {
     status.textContent = "Generazione in corso...";
 
     try {
-        // Usa JPEG al posto di PNG per forzare 3 canali (RGB) ed eliminare l'Alpha
-        // Swin2SR va in tilt o restituisce nero se riceve immagini RGBA (4 canali)
-        const imgDataUrl = inputCanvas.toDataURL('image/jpeg', 1.0);
+        console.time('Generazione Immagine');
+        console.log('Inizio generazione, attendere (il browser potrebbe freezare per qualche secondo)...');
 
-        // In transformers.js 3.x, image-to-image restituisce un array di RawImage
+        // --- 1. RIDUZIONE RISOLUZIONE ---
+        // Il Canvas è grande (512x512), ma i modelli SR in WASM esplodono o ci mettono minuti.
+        // Ridimensioniamo a una griglia compatibile col modello (Swin2SR-64 = input 64x64 nativo)
+        const lowResSize = 64;
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = lowResSize;
+        tempCanvas.height = lowResSize;
+        const tCtx = tempCanvas.getContext('2d');
+        tCtx.fillStyle = 'white'; // Sfondo bianco invece che trasparente
+        tCtx.fillRect(0, 0, lowResSize, lowResSize);
+        tCtx.drawImage(inputCanvas, 0, 0, lowResSize, lowResSize);
+
+        // Estrae l'immagine 64x64 in JPEG
+        const imgDataUrl = tempCanvas.toDataURL('image/jpeg', 0.9);
+
+        // Start Inference
+        const start = performance.now();
         const rawOutput = await model(imgDataUrl);
+        const end = performance.now();
+
+        console.log(`Generazione completata in ${((end - start) / 1000).toFixed(2)} secondi.`);
+        console.timeEnd('Generazione Immagine');
 
         // Gestisce sia array [RawImage] sia singolo RawImage
         const img = Array.isArray(rawOutput) ? rawOutput[0] : rawOutput;
@@ -105,8 +124,14 @@ async function generateImage() {
 }
 
 document.getElementById('clearBtn').onclick = () => {
-    ctx.clearRect(0, 0, inputCanvas.width, inputCanvas.height);
+    // Fill background with white instead of letting it be transparent
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, inputCanvas.width, inputCanvas.height);
     outputCanvas.getContext('2d').clearRect(0, 0, outputCanvas.width, outputCanvas.height);
 };
+
+// Inizializza sfondo bianco per il canvas di input anziché trasparente
+ctx.fillStyle = 'white';
+ctx.fillRect(0, 0, inputCanvas.width, inputCanvas.height);
 
 initAI();
