@@ -1,4 +1,8 @@
-import { pipeline } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1';
+import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1';
+
+// Disabilita il multi-threading WASM per evitare l'errore del SharedArrayBuffer
+// (Cross-Origin-Opener-Policy) che freeza la pagina durante l'inferenza
+env.backends.onnx.wasm.numThreads = 1;
 
 // Elementi DOM
 const inputCanvas = document.getElementById('inputCanvas');
