@@ -14,13 +14,21 @@ let model;
 // --- 1. INIZIALIZZAZIONE IA ---
 async function initAI() {
     try {
-        status.textContent = "Sto scaricando il modello via WebGPU...";
+        status.textContent = "Download modello in corso: 0%";
 
         // 'Xenova/swin2SR-classical-sr-x2-64' è pubblico, super-risoluzione x2, leggero (~50MB)
         const modelName = 'Xenova/swin2SR-classical-sr-x2-64';
 
         model = await pipeline('image-to-image', modelName, {
-            dtype: 'fp32', // Compatibile con tutti i browser, opzioni: 'fp32', 'fp16', 'q8', 'q4'
+            dtype: 'fp32',
+            progress_callback: (info) => {
+                if (info.status === 'downloading' && info.total) {
+                    const pct = Math.round((info.loaded / info.total) * 100);
+                    status.textContent = `Download modello: ${pct}%`;
+                } else if (info.status === 'loading') {
+                    status.textContent = 'Caricamento modello in memoria...';
+                }
+            }
         });
 
         status.textContent = "IA Pronta! Modello: " + modelName;
