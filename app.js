@@ -1,4 +1,4 @@
-import { pipeline } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
+import { pipeline } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1';
 
 // Elementi DOM
 const inputCanvas = document.getElementById('inputCanvas');
@@ -14,20 +14,21 @@ let model;
 // --- 1. INIZIALIZZAZIONE IA ---
 async function initAI() {
     try {
-        status.textContent = "Sto scaricando il modello (circa 2GB)...";
+        status.textContent = "Sto scaricando il modello via WebGPU (circa 2GB)...";
 
-        // Elenco di modelli compatibili con Transformers.js (v2) per image-to-image o text-to-image
-        // - 'Xenova/stable-diffusion-v1-5'
-        // - 'Xenova/stable-diffusion-2-1-base'
-        // NOTA: il task image-to-image reale potrebbe richiedere modelli quantizzati specifici
-        const modelName = 'Xenova/stable-diffusion-v1-5';
+        // La versione 3 di Transformers.js usa l'org ufficiale '@huggingface' e 'onnx-community'
+        // 'onnx-community/sd-turbo' è veloce e adatto al browser con WebGPU
+        const modelName = 'onnx-community/sd-turbo';
 
-        // Attenzione: usare 'image-to-image' o 'text-to-image' a seconda dei modelli supportati
-        model = await pipeline('image-to-image', modelName);
+        // Attenzione: usiamo 'text-to-image' dato che SD Turbo nativo è primariamente text-to-image e compatibile con WebGPU
+        model = await pipeline('text-to-image', modelName, {
+            device: 'webgpu',
+        });
 
         status.textContent = "IA Pronta! Usa il modello " + modelName;
     } catch (err) {
         status.textContent = "Errore durante il caricamento del modello.";
+
         console.error(err);
     }
 }
