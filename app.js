@@ -14,29 +14,27 @@ let model;
 // --- 1. INIZIALIZZAZIONE IA ---
 async function initAI() {
     try {
-        status.textContent = "Download modello in corso: 0%";
-
-        // 'Xenova/swin2SR-classical-sr-x2-64' è pubblico, super-risoluzione x2, leggero (~50MB)
+        status.textContent = "Inizializzazione WebGPU...";
         const modelName = 'Xenova/swin2SR-classical-sr-x2-64';
 
+        status.textContent = "Download modello in corso...";
+
         model = await pipeline('image-to-image', modelName, {
-            dtype: 'fp32',
+            device: 'webgpu', // Sfrutta la tua RTX 4090!
             progress_callback: (info) => {
                 if (info.status === 'downloading' && info.total) {
                     const pct = Math.round((info.loaded / info.total) * 100);
-                    status.textContent = `Download modello: ${pct}%`;
-                } else if (info.status === 'loading') {
-                    status.textContent = 'Caricamento modello in memoria...';
+                    status.textContent = `Download: ${pct}%`;
                 }
             }
         });
 
-        status.textContent = "IA Pronta! Modello: " + modelName;
+        status.textContent = "IA Pronta! (WebGPU attiva)";
     } catch (err) {
-        status.textContent = "Errore durante il caricamento del modello.";
-
-
-        console.error(err);
+        status.textContent = "WebGPU non disponibile. Uso CPU...";
+        console.warn("WebGPU Error:", err);
+        model = await pipeline('image-to-image', 'Xenova/swin2SR-classical-sr-x2-64');
+        status.textContent = "IA Pronta! (CPU)";
     }
 }
 
@@ -47,7 +45,6 @@ inputCanvas.addEventListener('mouseup', () => {
     ctx.beginPath();
     generateImage(); // Genera quando l'utente alza il pennello
 });
-
 inputCanvas.addEventListener('mousemove', draw);
 
 function draw(e) {
@@ -67,29 +64,31 @@ function draw(e) {
 async function generateImage() {
     if (!model) return;
 
-    status.textContent = "Generazione...";
-    const prompt = promptInput.value || "A high quality masterpiece";
+    try {
+        status.textContent = "Generazione in corso...";
 
-    // Convertiamo il canvas in un'immagine che l'IA può leggere
-    const imgData = inputCanvas.toDataURL('image/png');
+        // Swin2SR è un modello di Upscaling
+        const output = await model(inputCanvas.toDataURL('image/png'));
 
-    const output = await model(imgData, prompt, {
-        strength: 0.5, // Bilanciamento tra disegno e IA (0.1 = fedele al disegno, 0.9 = libera)
-        guidance_scale: 7.5,
-        num_inference_steps: 4, // Pochi step = Real-time
-    });
+        // Disegniamo il risultato sul secondo canvas
+        const outputCtx = outputCanvas.getContext('2d');
 
-    // Disegniamo il risultato sul secondo canvas
-    const outputCtx = outputCanvas.getContext('2d');
-    const resultImg = new Image();
-    resultImg.onload = () => outputCtx.drawImage(resultImg, 0, 0);
-    resultImg.src = output.uri;
+        // In Transformers.js v3, l'output di image-to-image può essere convertito in canvas
+        const img = await output.toCanvas();
+        outputCtx.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
+        outputCtx.drawImage(img, 0, 0, outputCanvas.width, outputCanvas.height);
 
-    status.textContent = "IA Pronta!";
+        status.textContent = "IA Pronta!";
+    } catch (err) {
+        status.textContent = "Errore generazione.";
+        console.error("Inference Error:", err);
+    }
 }
 
 document.getElementById('clearBtn').onclick = () => {
     ctx.clearRect(0, 0, inputCanvas.width, inputCanvas.height);
+    const outputCtx = outputCanvas.getContext('2d');
+    outputCtx.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
 };
 
 initAI();
