@@ -6,10 +6,8 @@ const status = document.getElementById('status');
 const promptInput = document.getElementById('prompt');
 const hfTokenInput = document.getElementById('hfToken');
 
-// Endpoint per modello Image-to-Image veloce e generativo
-// Utilizziamo le API Serverless di HF. Il modello "stabilityai/stable-diffusion-xl-base-1.0" 
-// per img2img tramite Inference API. (Altrimenti LCM-LoRA per max velocità)
-const HF_MODEL_URL = 'https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-refiner-1.0';
+// Endpoint per modello Image-to-Image (Stable Diffusion v1.5 img2img è il più stabile via API gratuite)
+const HF_MODEL_URL = 'https://api-inference.huggingface.co/models/runwayml/stable-diffusion-v1-5';
 
 // Stato
 let drawing = false;
@@ -70,32 +68,23 @@ async function generateImage() {
         const imageBlob = await getCanvasBlob(inputCanvas);
         const promptText = promptInput.value || "A beautiful highly detailed digital painting";
 
-        // Modalità API per image-to-image (generalmente FormData o JSON con field inputs).
-        // HuggingFace Inference API per Image-to-Text accetta FormData e per Image-to-Image varia a seconda del modello.
-        // Proviamo il passaggio JSON (image encodata base64) che è uno standard diffuso,
-        // oppure chiamiamo il modello passandogli il blob con header Custom.
+        // ATTENZIONE CORS: Inviare JSON con "Content-Type: application/json" fa scattare 
+        // una richiesta OPTIONS (Preflight) che i server di Hugging Face bloccano spesso.
+        // Soluzione: Inviare il file binario puro come body. L'API di HF capisce in automatico.
 
-        const b64 = await new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result.split(',')[1]);
-            reader.readAsDataURL(imageBlob);
-        });
-
-        const requestBody = JSON.stringify({
-            inputs: promptText,
-            parameters: {
-                image: b64, // Questo non tutti i modelli lo accettano, ma è il default di Diffusers
-                // strength: 0.8
-            }
-        });
+        // Trasformiamo il Blob in ArrayBuffer per una spedizione più grezza e sicura
+        const arrayBuffer = await imageBlob.arrayBuffer();
 
         const response = await fetch(HF_MODEL_URL, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
+                'X-Wait-For-Model': 'true', // Aggiunto per attendere il caricamento del modello
+                'X-Use-Cache': 'false', // Aggiunto per evitare cache se si vuole sempre nuova generazione
+                'Content-Type': 'image/jpeg', // Specifico il tipo di immagine
+                'Accept': 'image/jpeg' // Dico che accetto un'immagine come risposta
             },
-            body: requestBody
+            body: arrayBuffer
         });
 
         if (!response.ok) {
