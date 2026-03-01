@@ -69,7 +69,9 @@ async function generateImage() {
     status.textContent = "Generazione in corso...";
 
     try {
-        const imgDataUrl = inputCanvas.toDataURL('image/png');
+        // Usa JPEG al posto di PNG per forzare 3 canali (RGB) ed eliminare l'Alpha
+        // Swin2SR va in tilt o restituisce nero se riceve immagini RGBA (4 canali)
+        const imgDataUrl = inputCanvas.toDataURL('image/jpeg', 1.0);
 
         // In transformers.js 3.x, image-to-image restituisce un array di RawImage
         const rawOutput = await model(imgDataUrl);
