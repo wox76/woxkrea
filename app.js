@@ -15,11 +15,11 @@ let isGenerating = false;
 async function initAI() {
     status.textContent = "Download modello in corso...";
     try {
-        // Rileva se WebGPU è supportato per scegliere la configurazione ottimale
-        const hasWebGPU = !!navigator.gpu;
-        const device = hasWebGPU ? 'webgpu' : 'wasm';
-        const dtype = hasWebGPU ? 'fp32' : 'q8';
-        console.log(`Inizializzazione AI con device: ${device}, dtype: ${dtype}`);
+        // NOTA: WebGPU sta causando crash di memoria ('mapAsync' su GPUBuffer), 
+        // per cui blocchiamo temporaneamente in 'wasm' (CPU) con q8.
+        const device = 'wasm';
+        const dtype = 'q8';
+        console.log(`Inizializzazione AI forzata a: device: ${device}, dtype: ${dtype}`);
 
         const opts = {
             device: device,
