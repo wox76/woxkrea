@@ -116,7 +116,18 @@ async function generateImage() {
             imageData.data[i * 4 + 2] = data[i * ch + 2]; // B
             imageData.data[i * 4 + 3] = ch === 4 ? data[i * ch + 3] : 255; // A
         }
-        outputCtx.putImageData(imageData, 0, 0);
+
+        // Crea un canvas temporaneo per l'immagine generata (grande 128x128 tipicamente)
+        const outTempCanvas = document.createElement('canvas');
+        outTempCanvas.width = width;
+        outTempCanvas.height = height;
+        outTempCanvas.getContext('2d').putImageData(imageData, 0, 0);
+
+        // Disegna l'immagine risultante scalata sul canvas di output (512x512)
+        // Disabilitiamo lo smooting per mostrare i pixel nitidi (essendo low-res)
+        outputCtx.imageSmoothingEnabled = false;
+        outputCtx.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
+        outputCtx.drawImage(outTempCanvas, 0, 0, outputCanvas.width, outputCanvas.height);
 
         status.textContent = "IA Pronta! Disegna ancora...";
     } catch (err) {
