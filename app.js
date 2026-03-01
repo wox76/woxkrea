@@ -15,7 +15,8 @@ let isGenerating = false;
 async function initAI() {
     status.textContent = "Download modello in corso...";
     try {
-        model = await pipeline('image-to-image', 'Xenova/swin2SR-classical-sr-x2-64', {
+        // Specifica dtype per tutti i dispositivi (WebGPU e WASM)
+        const opts = {
             dtype: 'fp32',
             progress_callback: (info) => {
                 if (info.status === 'downloading' && info.total) {
@@ -25,7 +26,8 @@ async function initAI() {
                     status.textContent = 'Caricamento in memoria...';
                 }
             }
-        });
+        };
+        model = await pipeline('image-to-image', 'Xenova/swin2SR-classical-sr-x2-64', opts);
         status.textContent = "IA Pronta! Disegna qualcosa...";
     } catch (err) {
         status.textContent = "Errore caricamento modello.";
@@ -63,22 +65,25 @@ async function generateImage() {
     try {
         const imgDataUrl = inputCanvas.toDataURL('image/png');
 
-        // L'output di Swin2SR è un oggetto RawImage con .data, .width, .height, .channels
+        // In transformers.js 3.x, image-to-image restituisce un array di RawImage
         const rawOutput = await model(imgDataUrl);
 
-        // Disegniamo a partire dai dati RGB grezzi
-        const { data, width, height, channels } = rawOutput;
+        // Gestisce sia array [RawImage] sia singolo RawImage
+        const img = Array.isArray(rawOutput) ? rawOutput[0] : rawOutput;
+        const { data, width, height, channels } = img;
+
         const outputCtx = outputCanvas.getContext('2d');
         outputCanvas.width = width;
         outputCanvas.height = height;
 
         // Converte dati RGB/RGBA in ImageData per il canvas
         const imageData = new ImageData(width, height);
+        const ch = channels || 3;
         for (let i = 0; i < width * height; i++) {
-            imageData.data[i * 4 + 0] = data[i * channels + 0]; // R
-            imageData.data[i * 4 + 1] = data[i * channels + 1]; // G
-            imageData.data[i * 4 + 2] = data[i * channels + 2]; // B
-            imageData.data[i * 4 + 3] = 255;                    // A
+            imageData.data[i * 4 + 0] = data[i * ch + 0]; // R
+            imageData.data[i * 4 + 1] = data[i * ch + 1]; // G
+            imageData.data[i * 4 + 2] = data[i * ch + 2]; // B
+            imageData.data[i * 4 + 3] = ch === 4 ? data[i * ch + 3] : 255; // A
         }
         outputCtx.putImageData(imageData, 0, 0);
 
