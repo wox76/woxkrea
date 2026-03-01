@@ -15,15 +15,21 @@ let isGenerating = false;
 async function initAI() {
     status.textContent = "Download modello in corso...";
     try {
-        // Specifica dtype per tutti i dispositivi (WebGPU e WASM)
+        // Rileva se WebGPU è supportato per scegliere la configurazione ottimale
+        const hasWebGPU = !!navigator.gpu;
+        const device = hasWebGPU ? 'webgpu' : 'wasm';
+        const dtype = hasWebGPU ? 'fp32' : 'q8';
+        console.log(`Inizializzazione AI con device: ${device}, dtype: ${dtype}`);
+
         const opts = {
-            dtype: { model: 'fp32' },
+            device: device,
+            dtype: dtype,
             progress_callback: (info) => {
                 if (info.status === 'downloading' && info.total) {
                     const pct = Math.round((info.loaded / info.total) * 100);
                     status.textContent = `Download: ${pct}%`;
                 } else if (info.status === 'loading') {
-                    status.textContent = 'Caricamento in memoria...';
+                    status.textContent = `Caricamento in memoria (${device})...`;
                 }
             }
         };
