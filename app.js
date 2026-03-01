@@ -16,12 +16,11 @@ async function initAI() {
     try {
         status.textContent = "Sto scaricando il modello via WebGPU...";
 
-        // Pipeline 'image-to-image' supportata da Transformers.js v3
-        // 'Xenova/swin2SR-classical-sr-x2-64' è pubblico e non richiede autenticazione
+        // 'Xenova/swin2SR-classical-sr-x2-64' è pubblico, super-risoluzione x2, leggero (~50MB)
         const modelName = 'Xenova/swin2SR-classical-sr-x2-64';
 
         model = await pipeline('image-to-image', modelName, {
-            device: 'webgpu',
+            dtype: 'fp32', // Compatibile con tutti i browser, opzioni: 'fp32', 'fp16', 'q8', 'q4'
         });
 
         status.textContent = "IA Pronta! Modello: " + modelName;
