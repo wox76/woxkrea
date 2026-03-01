@@ -6,9 +6,9 @@ const status = document.getElementById('status');
 const promptInput = document.getElementById('prompt');
 const hfTokenInput = document.getElementById('hfToken');
 
-// instruct-pix2pix: accetta ENTRAMBI un'immagine (il disegno) + un prompt testuale
-// ed genera un'immagine che combina i due input
-const BASE_HF_URL = 'https://router.huggingface.co/hf-inference/models/timbrooks/instruct-pix2pix';
+// FLUX.1-Kontext-dev: modello ufficialmente consigliato da HF per image-to-image
+// Accetta sia un'immagine di input (il disegno) che un prompt testuale
+const BASE_HF_URL = 'https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-Kontext-dev';
 const HF_MODEL_URL = 'https://corsproxy.io/?' + encodeURIComponent(BASE_HF_URL);
 
 // Stato
@@ -77,7 +77,7 @@ async function generateImage() {
             reader.readAsDataURL(imageBlob);
         });
 
-        // instruct-pix2pix accetta: inputs = immagine base64, parameters.prompt = testo
+        // FLUX.1-Kontext-dev: inputs = immagine base64, parameters.prompt = testo di editing
         const response = await fetch(HF_MODEL_URL, {
             method: 'POST',
             headers: {
