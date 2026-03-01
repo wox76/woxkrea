@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Real-Time Sketch</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="toolbar">
+        <h1>AI Sketch to Image</h1>
+        <div class="controls">
+            <input type="text" id="prompt" placeholder="Descrivi cosa stai disegnando (es: un gatto spaziale)...">
+            <input type="color" id="colorPicker" value="#000000">
+            <input type="range" id="brushSize" min="1" max="50" value="10">
+            <button id="clearBtn">Pulisci</button>
+            <span id="status">Caricamento Modello...</span>
+        </div>
+    </div>
+
+    <main class="canvas-container">
+        <section class="pane">
+            <h2>Il tuo Disegno</h2>
+            <canvas id="inputCanvas" width="512" height="512"></canvas>
+        </section>
+        
+        <section class="pane">
+            <h2>Risultato AI</h2>
+            <canvas id="outputCanvas" width="512" height="512"></canvas>
+        </section>
+    </main>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>
