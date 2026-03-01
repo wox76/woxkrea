@@ -1,58 +1,39 @@
-import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1';
-
-// Disabilita il multi-threading WASM per evitare l'errore del SharedArrayBuffer
-// (Cross-Origin-Opener-Policy) che freeza la pagina durante l'inferenza
-env.backends.onnx.wasm.numThreads = 1;
-
 // Elementi DOM
 const inputCanvas = document.getElementById('inputCanvas');
 const outputCanvas = document.getElementById('outputCanvas');
 const ctx = inputCanvas.getContext('2d');
 const status = document.getElementById('status');
+const promptInput = document.getElementById('prompt');
+const hfTokenInput = document.getElementById('hfToken');
+
+// Endpoint per modello Image-to-Image veloce e generativo
+// Utilizziamo le API Serverless di HF. Il modello "stabilityai/stable-diffusion-xl-base-1.0" 
+// per img2img tramite Inference API. (Altrimenti LCM-LoRA per max velocità)
+const HF_MODEL_URL = 'https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-refiner-1.0';
 
 // Stato
 let drawing = false;
-let model;
 let isGenerating = false;
+let debounceTimer = null;
 
-// --- 1. INIZIALIZZAZIONE IA ---
-async function initAI() {
-    status.textContent = "Download modello in corso...";
-    try {
-        // NOTA: WebGPU sta causando crash di memoria ('mapAsync' su GPUBuffer), 
-        // per cui blocchiamo temporaneamente in 'wasm' (CPU) con q8.
-        const device = 'wasm';
-        const dtype = 'q8';
-        console.log(`Inizializzazione AI forzata a: device: ${device}, dtype: ${dtype}`);
+status.textContent = "IA Pronta! Inserisci il token HF e disegna...";
 
-        const opts = {
-            device: device,
-            dtype: dtype,
-            progress_callback: (info) => {
-                if (info.status === 'downloading' && info.total) {
-                    const pct = Math.round((info.loaded / info.total) * 100);
-                    status.textContent = `Download: ${pct}%`;
-                } else if (info.status === 'loading') {
-                    status.textContent = `Caricamento in memoria (${device})...`;
-                }
-            }
-        };
-        model = await pipeline('image-to-image', 'Xenova/swin2SR-classical-sr-x2-64', opts);
-        status.textContent = "IA Pronta! Disegna qualcosa...";
-    } catch (err) {
-        status.textContent = "Errore caricamento modello.";
-        console.error("Init Error:", err);
-    }
-}
-
-// --- 2. LOGICA DISEGNO ---
+// --- LOGICA DISEGNO ---
 inputCanvas.addEventListener('mousedown', () => drawing = true);
 inputCanvas.addEventListener('mouseup', () => {
     drawing = false;
     ctx.beginPath();
-    generateImage();
+
+    // Debounce: Inizia la generazione 500ms dopo l'ultimo tratto per non intasare l'API
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+        generateImage();
+    }, 500);
 });
 inputCanvas.addEventListener('mousemove', draw);
+promptInput.addEventListener('change', () => {
+    if (!drawing) generateImage();
+});
 
 function draw(e) {
     if (!drawing) return;
@@ -66,87 +47,104 @@ function draw(e) {
     ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
 }
 
-// --- 3. GENERAZIONE AI ---
+// Converti Canvas in Blob
+function getCanvasBlob(canvas) {
+    // Esporta il canvas intero a risoluzione nativa
+    return new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9));
+}
+
+// --- GENERAZIONE AI TRAMITE API ---
 async function generateImage() {
-    if (!model || isGenerating) return;
-    isGenerating = true;
-    status.textContent = "Generazione in corso...";
-
-    try {
-        console.time('Generazione Immagine');
-        console.log('Inizio generazione, attendere (il browser potrebbe freezare per qualche secondo)...');
-
-        // --- 1. RIDUZIONE RISOLUZIONE ---
-        // Il Canvas è grande (512x512), ma i modelli SR in WASM esplodono o ci mettono minuti.
-        // Ridimensioniamo a una griglia compatibile col modello (Swin2SR-64 = input 64x64 nativo)
-        const lowResSize = 64;
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = lowResSize;
-        tempCanvas.height = lowResSize;
-        const tCtx = tempCanvas.getContext('2d');
-        tCtx.fillStyle = 'white'; // Sfondo bianco invece che trasparente
-        tCtx.fillRect(0, 0, lowResSize, lowResSize);
-        tCtx.drawImage(inputCanvas, 0, 0, lowResSize, lowResSize);
-
-        // Estrae l'immagine 64x64 in JPEG
-        const imgDataUrl = tempCanvas.toDataURL('image/jpeg', 0.9);
-
-        // Start Inference
-        const start = performance.now();
-        const rawOutput = await model(imgDataUrl);
-        const end = performance.now();
-
-        console.log(`Generazione completata in ${((end - start) / 1000).toFixed(2)} secondi.`);
-        console.timeEnd('Generazione Immagine');
-
-        // Gestisce sia array [RawImage] sia singolo RawImage
-        const img = Array.isArray(rawOutput) ? rawOutput[0] : rawOutput;
-        const { data, width, height, channels } = img;
-
-        const outputCtx = outputCanvas.getContext('2d');
-        outputCanvas.width = width;
-        outputCanvas.height = height;
-
-        // Converte dati RGB/RGBA in ImageData per il canvas
-        const imageData = new ImageData(width, height);
-        const ch = channels || 3;
-        for (let i = 0; i < width * height; i++) {
-            imageData.data[i * 4 + 0] = data[i * ch + 0]; // R
-            imageData.data[i * 4 + 1] = data[i * ch + 1]; // G
-            imageData.data[i * 4 + 2] = data[i * ch + 2]; // B
-            imageData.data[i * 4 + 3] = ch === 4 ? data[i * ch + 3] : 255; // A
-        }
-
-        // Crea un canvas temporaneo per l'immagine generata (grande 128x128 tipicamente)
-        const outTempCanvas = document.createElement('canvas');
-        outTempCanvas.width = width;
-        outTempCanvas.height = height;
-        outTempCanvas.getContext('2d').putImageData(imageData, 0, 0);
-
-        // Disegna l'immagine risultante scalata sul canvas di output (512x512)
-        // Disabilitiamo lo smooting per mostrare i pixel nitidi (essendo low-res)
-        outputCtx.imageSmoothingEnabled = false;
-        outputCtx.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
-        outputCtx.drawImage(outTempCanvas, 0, 0, outputCanvas.width, outputCanvas.height);
-
-        status.textContent = "IA Pronta! Disegna ancora...";
-    } catch (err) {
-        status.textContent = "Errore generazione: " + err.message;
-        console.error("Inference Error:", err);
+    const token = hfTokenInput ? hfTokenInput.value.trim() : "";
+    if (!token) {
+        status.textContent = "Errore: Inserisci il token Hugging Face nel box in alto per generare via Server!";
+        return;
     }
 
-    isGenerating = false;
+    if (isGenerating) return;
+    isGenerating = true;
+    status.textContent = "Generazione Cloud in corso...";
+    console.time('Generazione Immagine API');
+
+    try {
+        const imageBlob = await getCanvasBlob(inputCanvas);
+        const promptText = promptInput.value || "A beautiful highly detailed digital painting";
+
+        // Modalità API per image-to-image (generalmente FormData o JSON con field inputs).
+        // HuggingFace Inference API per Image-to-Text accetta FormData e per Image-to-Image varia a seconda del modello.
+        // Proviamo il passaggio JSON (image encodata base64) che è uno standard diffuso,
+        // oppure chiamiamo il modello passandogli il blob con header Custom.
+
+        const b64 = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result.split(',')[1]);
+            reader.readAsDataURL(imageBlob);
+        });
+
+        const requestBody = JSON.stringify({
+            inputs: promptText,
+            parameters: {
+                image: b64, // Questo non tutti i modelli lo accettano, ma è il default di Diffusers
+                // strength: 0.8
+            }
+        });
+
+        const response = await fetch(HF_MODEL_URL, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: requestBody
+        });
+
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`Errore API ${response.status}: ${errText}`);
+        }
+
+        const outBlob = await response.blob();
+
+        // Controlla se abbiamo beccato l'errore JSON "Model is loading"
+        if (outBlob.type.startsWith('application/json')) {
+            const text = await outBlob.text();
+            throw new Error("Risposta anomala JSON: " + text);
+        }
+
+        const outUrl = URL.createObjectURL(outBlob);
+
+        // Disegna l'immagine risultante sul canvas di output
+        const outputCtx = outputCanvas.getContext('2d');
+        const img = new Image();
+        img.onload = () => {
+            outputCtx.imageSmoothingEnabled = true;
+            outputCtx.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
+            outputCtx.drawImage(img, 0, 0, outputCanvas.width, outputCanvas.height);
+            URL.revokeObjectURL(outUrl);
+            status.textContent = "IA Pronta! Disegna ancora...";
+            console.timeEnd('Generazione Immagine API');
+            isGenerating = false;
+        };
+        img.onerror = () => {
+            throw new Error("Impossibile caricare l'immagine generata.");
+        };
+        img.src = outUrl;
+
+    } catch (err) {
+        status.textContent = "Errore Server: " + err.message;
+        console.error("Inference API Error:", err);
+        isGenerating = false;
+        console.timeEnd('Generazione Immagine API');
+    }
 }
 
 document.getElementById('clearBtn').onclick = () => {
-    // Fill background with white instead of letting it be transparent
+    // Sfondo bianco invece che trasparente
     ctx.fillStyle = 'white';
     ctx.fillRect(0, 0, inputCanvas.width, inputCanvas.height);
     outputCanvas.getContext('2d').clearRect(0, 0, outputCanvas.width, outputCanvas.height);
 };
 
-// Inizializza sfondo bianco per il canvas di input anziché trasparente
+// Inizializza sfondo bianco per il canvas di input
 ctx.fillStyle = 'white';
 ctx.fillRect(0, 0, inputCanvas.width, inputCanvas.height);
-
-initAI();
